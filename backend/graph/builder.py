@@ -55,3 +55,15 @@ def get_stats(G: nx.DiGraph) -> dict:
         "avg_degree": round(sum(degrees) / len(degrees), 4),
         "connected_components": components
     }
+
+def load():
+    import pickle
+    with open("data/graph.pkl", "rb") as f:
+        return pickle.load(f)
+
+def load_sample(n=10000):
+    import pickle
+    with open("data/graph.pkl", "rb") as f:
+        G = pickle.load(f)
+    nodes = list(G.nodes())[:n]
+    return G.subgraph(nodes).copy()
