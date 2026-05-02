@@ -2,3 +2,6 @@ backend/data/paysim.csv
 backend/data/graph.pkl
 backend/**/__pycache__/
 backend/**/*.pyc
+backend/ml/pyg_data.pt
+backend/ml/graphsage.pt
+backend/ml/iso_forest.pkl
