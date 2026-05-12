@@ -5,3 +5,5 @@ backend/**/*.pyc
 backend/ml/pyg_data.pt
 backend/ml/graphsage.pt
 backend/ml/iso_forest.pkl
+venv/
+backend/data/scores.json
