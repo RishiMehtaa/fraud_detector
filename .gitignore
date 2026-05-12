@@ -7,3 +7,4 @@ backend/ml/graphsage.pt
 backend/ml/iso_forest.pkl
 venv/
 backend/data/scores.json
+.env
