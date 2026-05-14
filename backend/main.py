@@ -9,6 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from graph.builder import load
 from ml.gnn import load_gnn_model
 from ml.isolation_forest import load_model
+from dotenv import load_dotenv
+load_dotenv()
 
 
 # @asynccontextmanager

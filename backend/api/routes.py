@@ -1,5 +1,8 @@
 # backend/api/routes.py
 from fastapi import APIRouter, Request, Query
+# --- at top of file, add to existing imports ---
+from chatbot.nl2cypher import query as nl_query
+from pydantic import BaseModel as PydanticBase
 
 router = APIRouter()
 
@@ -229,3 +232,23 @@ def get_evidence(account_id: str, request: Request):
 
 
     return build_evidence(account_id, scores_map, G)
+
+
+
+
+class ChatRequest(PydanticBase):
+    question: str
+    preset: str | None = None
+
+@router.post("/chat")
+def chat(body: ChatRequest):
+    result = nl_query(body.question, preset=body.preset)
+    summary = None
+    if result["records"] and not result["error"]:
+        summary = f"Query returned {len(result['records'])} record(s)."
+    return {
+        "cypher": result["cypher"],
+        "records": result["records"][:50],
+        "summary": summary,
+        "error": result["error"],
+    }
