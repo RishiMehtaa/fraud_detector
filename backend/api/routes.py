@@ -60,9 +60,9 @@ def get_alerts(request: Request, limit: int = Query(100, le=500)):
     scores_list: list[dict] = request.app.state.scores
     G = request.app.state.graph
 
-    sorted_scores = sorted(scores_list, key=lambda x: x["risk_score"], reverse=True)
-    top = sorted_scores[:limit]
-
+    # sorted_scores = sorted(scores_list, key=lambda x: x["risk_score"], reverse=True)
+    # top = sorted_scores[:limit]
+    top = scores_list[:limit]
     results = []
     for s in top:
         aid = s["account_id"]
@@ -110,14 +110,15 @@ def get_account(account_id: str, request: Request):
         })
 
     sub_edges = []
-    for u, v, attrs in G.edges(data=True):
-        if u in subgraph_nodes and v in subgraph_nodes:
-            sub_edges.append({
-                "source": u, "target": v,
-                "amount": attrs.get("amount", 0),
-                "timestamp": str(attrs.get("timestamp", "")),
-                "type": attrs.get("type", ""),
-            })
+    for nid in subgraph_nodes:
+        for u, v, attrs in G.edges(nid, data=True):
+            if v in subgraph_nodes:
+                sub_edges.append({
+                    "source": u, "target": v,
+                    "amount": attrs.get("amount", 0),
+                    "timestamp": str(attrs.get("timestamp", "")),
+                    "type": attrs.get("type", ""),
+                })
 
     timeline = sorted(
         [e for e in sub_edges if e["source"] == account_id or e["target"] == account_id],
@@ -126,14 +127,14 @@ def get_account(account_id: str, request: Request):
 
     sc = scores_map.get(account_id, {})
     return {
-        "account_id": account_id,
-        "risk_score": sc.get("risk_score", 0),
-        "shap_breakdown": sc.get("shap_breakdown", {}),
-        "triggered_patterns": sc.get("triggered_patterns", []),
-        "subgraph": {"nodes": sub_nodes, "edges": sub_edges},
-        "timeline": timeline,
-    }
-
+    "account_id": account_id,
+    "risk_score": sc.get("risk_score", 0),
+    "shap_breakdown": sc.get("shap_breakdown", {}),
+    "triggered_patterns": sc.get("triggered_patterns", []),
+    "nodes": sub_nodes,        # was "subgraph": {"nodes": ..., "edges": ...}
+    "edges": sub_edges,
+    "transactions": timeline,  # was "timeline"
+}
 
 import networkx as nx
 

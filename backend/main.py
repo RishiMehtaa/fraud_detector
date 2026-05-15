@@ -22,15 +22,44 @@ load_dotenv()
 #     app.state.iso = load_model()
 #     yield
 
+# @asynccontextmanager
+# async def lifespan(app: FastAPI):
+#     app.state.graph = load()
+#     with open("data/scores.json", "r", encoding="utf-8") as f:
+#         scores_list = json.load(f)
+#     app.state.scores = scores_list
+#     app.state.scores_map = {s["account_id"]: s for s in scores_list}
+#     app.state.gnn = load_gnn_model()
+#     app.state.iso = load_model()
+#     yield
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    print("Loading graph...")
     app.state.graph = load()
-    with open("data/scores.json", "r", encoding="utf-8") as f:
+    print(f"Graph loaded.")
+    
+    # print("Loading scores...")
+    # with open("data/scores.json", "r", encoding="utf-8") as f:
+    #     scores_list = json.load(f)
+    # # app.state.scores = scores_list
+    # app.state.scores = sorted(scores_list, key=lambda x: x["risk_score"], reverse=True)
+    # app.state.scores_map = {s["account_id"]: s for s in scores_list}
+    # print(f"Scores loaded: {len(scores_list)} accounts.")
+
+    print("Loading scores...")
+    with open("data/scores_top.json", "r", encoding="utf-8") as f:
         scores_list = json.load(f)
-    app.state.scores = scores_list
-    app.state.scores_map = {s["account_id"]: s for s in scores_list}
+    scores_sorted = sorted(scores_list, key=lambda x: x["risk_score"], reverse=True)
+    app.state.scores = scores_sorted[:500]  # only top 500
+    app.state.scores_map = {s["account_id"]: s for s in scores_sorted[:500]}
+    print(f"Scores loaded: {len(app.state.scores)} top accounts.")
+    
+    print("Loading GNN...")
     app.state.gnn = load_gnn_model()
+    print("Loading IsoForest...")
     app.state.iso = load_model()
+    print("All loaded. Server ready.")
     yield
 
 
@@ -38,7 +67,7 @@ app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080", "http://localhost:3000"],
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
