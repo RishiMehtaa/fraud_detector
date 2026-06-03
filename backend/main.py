@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI):
     # print(f"Scores loaded: {len(scores_list)} accounts.")
 
     print("Loading scores...")
-    with open("data/scores_top.json", "r", encoding="utf-8") as f:
+    with open("data/scores.json", "r", encoding="utf-8") as f:
         scores_list = json.load(f)
     scores_sorted = sorted(scores_list, key=lambda x: x["risk_score"], reverse=True)
     app.state.scores = scores_sorted[:500]  # only top 500

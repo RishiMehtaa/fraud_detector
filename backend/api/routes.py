@@ -190,7 +190,7 @@ def explain_account(account_id: str, request: Request):
     f"Triggered detection patterns: {', '.join(patterns) if patterns else 'none'}. "
     f"Top risk contributors (SHAP): {shap_str}. "
     f"Feature key: gnn=graph neural network score, iso=isolation forest anomaly score, "
-    f"cycle=circular transaction pattern, struct=structuring behavior, "
+    f"cycle=circular transaction pattern, structure=transaction structuring behavior, "
     f"shell=shell cluster membership, dormancy=dormant account reactivation, profile=volume mismatch. "
     f"Write 2-3 sentences explaining why this account is suspicious, in plain English for a fraud investigator."
 )

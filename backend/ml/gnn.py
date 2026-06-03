@@ -12,15 +12,52 @@ from ml.isolation_forest import load_model, score
 import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import SAGEConv
-from torch_geometric.transforms import RandomNodeSplit
 from sklearn.metrics import precision_score, recall_score, f1_score
+
+from data.loader import DATA_PATH
 
 ISO_MODEL_PATH = Path(__file__).parent / "iso_forest.pkl"
 
 
+def _make_stratified_masks(labels: torch.Tensor, seed: int = 42) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    rng = np.random.default_rng(seed)
+    labels_np = labels.cpu().numpy().astype(int)
+    indices = np.arange(labels_np.shape[0])
+
+    train_indices = []
+    val_indices = []
+    test_indices = []
+
+    for value in (0, 1):
+        class_indices = indices[labels_np == value]
+        rng.shuffle(class_indices)
+        n = len(class_indices)
+        n_test = max(1, int(round(n * 0.15)))
+        n_val = max(1, int(round(n * 0.15)))
+        if n_test + n_val >= n:
+            n_test = max(1, n // 5)
+            n_val = max(1, n // 5)
+        test_indices.extend(class_indices[:n_test])
+        val_indices.extend(class_indices[n_test:n_test + n_val])
+        train_indices.extend(class_indices[n_test + n_val:])
+
+    rng.shuffle(train_indices)
+    rng.shuffle(val_indices)
+    rng.shuffle(test_indices)
+
+    num_nodes = labels_np.shape[0]
+    train_mask = torch.zeros(num_nodes, dtype=torch.bool)
+    val_mask = torch.zeros(num_nodes, dtype=torch.bool)
+    test_mask = torch.zeros(num_nodes, dtype=torch.bool)
+    train_mask[train_indices] = True
+    val_mask[val_indices] = True
+    test_mask[test_indices] = True
+    return train_mask, val_mask, test_mask
+
+
 def _get_iso_scores_by_account() -> dict:
     model = load_model()
-    raw_csv = pd.read_csv(Path(__file__).parent.parent / "data" / "paysim.csv")
+    raw_csv = pd.read_csv(DATA_PATH)
     s = score(model)
     raw_csv["anomaly_score"] = s.values
     orig = raw_csv.groupby("nameOrig")["anomaly_score"].mean().to_dict()
@@ -48,23 +85,54 @@ def build_pyg_data() -> Data:
         out_edges = list(G.out_edges(n, data=True))
         in_edges = list(G.in_edges(n, data=True))
 
-        avg_sent = float(np.mean([e[2]["amount"] for e in out_edges])) if out_edges else 0.0
-        avg_recv = float(np.mean([e[2]["amount"] for e in in_edges])) if in_edges else 0.0
+        out_amounts = [e[2]["amount"] for e in out_edges]
+        in_amounts = [e[2]["amount"] for e in in_edges]
+
+        avg_sent = float(np.mean(out_amounts)) if out_amounts else 0.0
+        avg_recv = float(np.mean(in_amounts)) if in_amounts else 0.0
+        total_sent = float(np.sum(out_amounts)) if out_amounts else 0.0
+        total_recv = float(np.sum(in_amounts)) if in_amounts else 0.0
+        sent_std = float(np.std(out_amounts)) if len(out_amounts) > 1 else 0.0
+        recv_std = float(np.std(in_amounts)) if len(in_amounts) > 1 else 0.0
 
         all_edges = out_edges + in_edges
         if all_edges:
             timestamps = [e[2]["timestamp"] for e in all_edges]
             ts_sorted = sorted(timestamps)
-            window = pd.Timestamp("2024-01-01") + pd.Timedelta(hours=24)
+            span_hours = float((ts_sorted[-1] - ts_sorted[0]).total_seconds() / 3600.0) if len(ts_sorted) > 1 else 0.0
+            gaps = [
+                float((b - a).total_seconds() / 3600.0)
+                for a, b in zip(ts_sorted, ts_sorted[1:])
+            ]
+            avg_gap_hours = float(np.mean(gaps)) if gaps else 0.0
             recent = [t for t in ts_sorted if t >= ts_sorted[-1] - pd.Timedelta(hours=24)]
             tx_velocity = len(recent)
         else:
+            span_hours = 0.0
+            avg_gap_hours = 0.0
             tx_velocity = 0
+
+        unique_counterparties = float(len({edge[1] for edge in out_edges} | {edge[0] for edge in in_edges}))
 
         iso_score = iso_scores.get(n, 0.0)
         acct_type = 1.0 if str(n).startswith("M") else 0.0
 
-        rows.append([in_deg, out_deg, avg_sent, avg_recv, tx_velocity, iso_score, acct_type])
+        rows.append([
+            in_deg,
+            out_deg,
+            avg_sent,
+            avg_recv,
+            total_sent,
+            total_recv,
+            sent_std,
+            recv_std,
+            span_hours,
+            avg_gap_hours,
+            unique_counterparties,
+            tx_velocity,
+            iso_score,
+            acct_type,
+        ])
 
     x = torch.tensor(rows, dtype=torch.float)
 
@@ -81,7 +149,9 @@ def build_pyg_data() -> Data:
 
     y = torch.tensor(fraud_labels, dtype=torch.float)
 
-    data = Data(x=x, edge_index=edge_index, y=y)
+    train_mask, val_mask, test_mask = _make_stratified_masks(y)
+
+    data = Data(x=x, edge_index=edge_index, y=y, train_mask=train_mask, val_mask=val_mask, test_mask=test_mask)
     torch.save(data, Path(__file__).parent / "pyg_data.pt")
     return data
 
@@ -95,55 +165,87 @@ class GraphSAGE(nn.Module):
         self.conv1 = SAGEConv(in_channels, 64)
         self.conv2 = SAGEConv(64, 32)
         self.classifier = nn.Linear(32, 1)
+        self.skip = nn.Linear(in_channels, 1)
         self.dropout = nn.Dropout(0.3)
 
     def forward(self, x, edge_index):
+        residual = self.skip(x)
         x = F.relu(self.conv1(x, edge_index))
         x = self.dropout(x)
         x = F.relu(self.conv2(x, edge_index))
         x = self.dropout(x)
-        return self.classifier(x).squeeze(-1)
+        return (self.classifier(x) + residual).squeeze(-1)
+
+
+def _best_threshold(labels: np.ndarray, probabilities: np.ndarray) -> float:
+    candidates = np.unique(np.concatenate(([0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95], probabilities)))
+    best_threshold = 0.5
+    best_f1 = -1.0
+
+    for threshold in candidates:
+        preds = (probabilities >= threshold).astype(int)
+        f1 = f1_score(labels, preds, zero_division=0)
+        if f1 > best_f1:
+            best_f1 = f1
+            best_threshold = float(threshold)
+
+    return best_threshold
 
 
 def train_gnn():
-    data = torch.load(Path(__file__).parent / "pyg_data.pt")
+    data = torch.load(Path(__file__).parent / "pyg_data.pt", weights_only=False)
 
-    transform = RandomNodeSplit(split="train_rest", num_val=0.1, num_test=0.1)
-    data = transform(data)
+    if not hasattr(data, "train_mask") or not hasattr(data, "val_mask") or not hasattr(data, "test_mask"):
+        train_mask, val_mask, test_mask = _make_stratified_masks(data.y)
+        data.train_mask = train_mask
+        data.val_mask = val_mask
+        data.test_mask = test_mask
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     data = data.to(device)
 
     model = GraphSAGE(in_channels=data.x.shape[1]).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
-    criterion = nn.BCEWithLogitsLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.005)
 
-    for epoch in range(1, 51):
+    train_labels = data.y[data.train_mask]
+    positive_count = float(train_labels.sum().item())
+    negative_count = float(train_labels.numel() - positive_count)
+    pos_weight = torch.tensor([negative_count / max(positive_count, 1.0)], device=device)
+    criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+
+    for epoch in range(1, 101):
         model.train()
         optimizer.zero_grad()
         out = model(data.x, data.edge_index)
         loss = criterion(out[data.train_mask], data.y[data.train_mask])
         loss.backward()
         optimizer.step()
-        if epoch % 10 == 0:
+        if epoch % 20 == 0:
             print(f"Epoch {epoch:02d} | Loss: {loss.item():.4f}")
 
     model.eval()
     with torch.no_grad():
         out = model(data.x, data.edge_index)
-        preds = (torch.sigmoid(out[data.test_mask]) > 0.5).cpu().numpy()
-        labels = data.y[data.test_mask].cpu().numpy()
+        val_probs = torch.sigmoid(out[data.val_mask]).cpu().numpy()
+        val_labels = data.y[data.val_mask].cpu().numpy()
+        threshold = _best_threshold(val_labels, val_probs)
 
-    print(f"Precision: {precision_score(labels, preds, zero_division=0):.4f}")
-    print(f"Recall:    {recall_score(labels, preds, zero_division=0):.4f}")
-    print(f"F1:        {f1_score(labels, preds, zero_division=0):.4f}")
+        test_probs = torch.sigmoid(out[data.test_mask]).cpu().numpy()
+        test_labels = data.y[data.test_mask].cpu().numpy()
+        preds = (test_probs >= threshold).astype(int)
+
+    print(f"Selected threshold: {threshold:.2f}")
+    print(f"Precision: {precision_score(test_labels, preds, zero_division=0):.4f}")
+    print(f"Recall:    {recall_score(test_labels, preds, zero_division=0):.4f}")
+    print(f"F1:        {f1_score(test_labels, preds, zero_division=0):.4f}")
 
     torch.save(model.state_dict(), Path(__file__).parent / "graphsage.pt")
     print("Model saved to ml/graphsage.pt")
 
 
 def load_gnn_model() -> GraphSAGE:
-    model = GraphSAGE(in_channels=7)
+    data = torch.load(Path(__file__).parent / "pyg_data.pt", weights_only=False, map_location="cpu")
+    model = GraphSAGE(in_channels=data.x.shape[1])
     state = torch.load(Path(__file__).parent / "graphsage.pt", 
                        weights_only=True, map_location="cpu")
     model.load_state_dict(state)

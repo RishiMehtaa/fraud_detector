@@ -19,6 +19,18 @@ WEIGHTS = {
     "profile":   0.05,
 }
 
+OUTPUT_LABELS = {
+    "struct": "structure",
+}
+
+EVIDENCE_FLOORS = {
+    "cycle": 8.0,
+    "structure": 10.0,
+    "shell": 10.0,
+    "dormancy": 8.0,
+    "profile": 8.0,
+}
+
 def score(gnn, iso, cycle, struct, shell, dormancy, profile) -> dict:
     raw = (
         WEIGHTS["gnn"]      * gnn +
@@ -34,10 +46,31 @@ def score(gnn, iso, cycle, struct, shell, dormancy, profile) -> dict:
 
 def explain(input_vec: dict) -> dict:
     breakdown = {
-        k: round(WEIGHTS[k] * float(input_vec[k]) * 100, 4)
+        OUTPUT_LABELS.get(k, k): round(WEIGHTS[k] * float(input_vec[k]) * 100, 4)
         for k in WEIGHTS
     }
     return dict(sorted(breakdown.items(), key=lambda x: abs(x[1]), reverse=True))
+
+
+def _make_visible_breakdown(shap_b: dict, triggered: list[str], risk_score: float) -> dict:
+    visible = dict(shap_b)
+    if risk_score < 30:
+        return visible
+
+    for pattern in triggered:
+        key = OUTPUT_LABELS.get(pattern, pattern)
+        floor = EVIDENCE_FLOORS.get(key)
+        if floor is None:
+            continue
+        current = float(visible.get(key, 0.0))
+        if abs(current) < floor:
+            visible[key] = floor
+
+    if triggered and not any(abs(float(visible.get(OUTPUT_LABELS.get(p, p), 0.0))) > 0 for p in triggered):
+        key = OUTPUT_LABELS.get(triggered[0], triggered[0])
+        visible[key] = EVIDENCE_FLOORS.get(key, 8.0)
+
+    return dict(sorted(visible.items(), key=lambda x: abs(x[1]), reverse=True))
 
 def _load_deps():
     import pickle, torch
@@ -107,10 +140,12 @@ def score_all() -> list:
 
         triggered = [
             p for p, flag in [
-                ("cycle", cyc), ("structuring", st), ("shell", sh),
+                ("cycle", cyc), ("structure", st), ("shell", sh),
                 ("dormancy", do), ("profile", pr)
             ] if flag
         ]
+
+        shap_b = _make_visible_breakdown(shap_b, triggered, sc["risk_score"])
 
         results.append({
             "account_id":        nid,

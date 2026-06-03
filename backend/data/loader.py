@@ -1,7 +1,9 @@
 import pandas as pd
 from pathlib import Path
 
-DATA_PATH = Path(__file__).parent / "paysim.csv"
+DEMO_DATA_PATH = Path(__file__).parent / "fraud_demo_test.csv"
+PAYSIM_DATA_PATH = Path(__file__).parent / "paysim.csv"
+DATA_PATH = DEMO_DATA_PATH if DEMO_DATA_PATH.exists() else PAYSIM_DATA_PATH
 
 def load() -> pd.DataFrame:
     df = pd.read_csv(DATA_PATH)

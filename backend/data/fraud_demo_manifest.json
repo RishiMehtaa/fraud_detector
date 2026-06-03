@@ -1,0 +1,38 @@
+{
+  "seed": 42,
+  "row_count": 530,
+  "fraud_rows": 114,
+  "fraud_by_type": {
+    "normal": 0,
+    "cycle": 18,
+    "structuring": 30,
+    "dormant_reactivation": 11,
+    "shell_cluster": 36,
+    "profile_mismatch": 11,
+    "dormant": 2,
+    "shell": 2,
+    "profile": 4
+  },
+  "fraud_case_ids": [
+    "cycle_01",
+    "struct_01",
+    "dormant_01",
+    "shell_01",
+    "profile_01"
+  ],
+  "schema": [
+    "nameOrig",
+    "nameDest",
+    "type",
+    "amount",
+    "step",
+    "oldbalanceOrg",
+    "newbalanceOrig",
+    "oldbalanceDest",
+    "newbalanceDest",
+    "isFraud",
+    "fraud_type",
+    "case_id",
+    "note"
+  ]
+}

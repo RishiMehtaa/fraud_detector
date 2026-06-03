@@ -2,12 +2,12 @@ import networkx as nx
 import pandas as pd
 import pickle
 from pathlib import Path
-from data.loader import load
+from data.loader import load as load_csv
 
 GRAPH_PATH = Path(__file__).parent.parent / "data" / "graph.pkl"
 
 def build() -> nx.DiGraph:
-    df = load()
+    df = load_csv()
     G = nx.DiGraph()
 
     # Node stats
@@ -58,12 +58,12 @@ def get_stats(G: nx.DiGraph) -> dict:
 
 def load():
     import pickle
-    with open("data/graph.pkl", "rb") as f:
+    with open(GRAPH_PATH, "rb") as f:
         return pickle.load(f)
 
 def load_sample(n=10000):
     import pickle
-    with open("data/graph.pkl", "rb") as f:
+    with open(GRAPH_PATH, "rb") as f:
         G = pickle.load(f)
     nodes = list(G.nodes())[:n]
     return G.subgraph(nodes).copy()

@@ -6,13 +6,13 @@ from pathlib import Path
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import LabelEncoder
 
-from data.loader import load
+from data.loader import DATA_PATH, load
 
 MODEL_PATH = Path(__file__).parent / "iso_forest.pkl"
 
 
 def _build_features(df: pd.DataFrame) -> pd.DataFrame:
-    raw = pd.read_csv(Path(__file__).parent.parent / "data" / "paysim.csv")
+    raw = pd.read_csv(DATA_PATH)
     enc = LabelEncoder()
     raw["type_encoded"] = enc.fit_transform(raw["type"])
     raw["hour_of_day"] = (raw["step"] % 24).astype(int)
