@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../models/alert.dart';
 import '../providers/alerts_provider.dart';
 import '../widgets/risk_badge.dart';
+import '../utils/formatters.dart';
 
 class AlertQueuePage extends ConsumerWidget {
   const AlertQueuePage({super.key});
@@ -16,6 +17,38 @@ class AlertQueuePage extends ConsumerWidget {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('Error: $e')),
       data: (alerts) => _AlertList(alerts: alerts),
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  final double score;
+  const _StatusChip({required this.score});
+
+  @override
+  Widget build(BuildContext context) {
+    String label = 'NEW';
+    Color color = Colors.blue;
+    if (score > 85) {
+      label = 'PRIORITY';
+      color = Colors.red;
+    } else if (score > 60) {
+      label = 'REVIEW';
+      color = Colors.orange;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withOpacity(0.5), width: 0.5),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+            color: color, fontSize: 8, fontWeight: FontWeight.bold),
+      ),
     );
   }
 }
@@ -127,10 +160,12 @@ class _AlertCard extends StatelessWidget {
                   RiskBadge(score: alert.riskScore),
                   const SizedBox(height: 6),
                   Text(
-                    '₹${(alert.amount / 1000).toStringAsFixed(1)}K',
+                    FormatUtils.compactAmount(alert.amount),
                     style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant),
                   ),
+                  const SizedBox(height: 4),
+                  _StatusChip(score: alert.riskScore),
                 ],
               ),
               const SizedBox(width: 4),

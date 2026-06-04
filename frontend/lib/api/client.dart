@@ -49,7 +49,8 @@ receiveTimeout: const Duration(seconds: 90),
   // GET /trace/{source}/{dest}
   Future<List<dynamic>> getTrace(String source, String dest) async {
     final r = await _dio.get('/trace/$source/$dest');
-    return r.data as List<dynamic>;
+    final data = r.data as Map<String, dynamic>;
+    return data['paths'] as List<dynamic>;
   }
 
   // POST /explain/{id}

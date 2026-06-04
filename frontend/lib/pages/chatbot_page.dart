@@ -89,7 +89,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Graph Chatbot',
+                  Text('Achilles',
                       style: theme.textTheme.headlineSmall
                           ?.copyWith(fontWeight: FontWeight.w700)),
                   Text('Ask questions about the transaction network',
@@ -248,51 +248,10 @@ class _ResponseBody extends StatelessWidget {
     final theme = Theme.of(context);
     final records = data['records'] as List<dynamic>? ?? [];
     final summary = data['summary'] as String? ?? '';
-    final cypher = data['cypher'] as String? ?? '';
-
-    // Check if records look like graph data
-    final hasNodes = records.isNotEmpty &&
-        (records.first as Map<String, dynamic>?)?.containsKey('id') == true;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Records: graph or table
-        if (records.isNotEmpty)
-          Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-              side: BorderSide(color: theme.colorScheme.outlineVariant),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: hasNodes
-                  ? SizedBox(
-                      height: 260,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0D0D1A),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: GraphCanvas(
-                            nodes: records
-                                .map((e) => GraphNode.fromJson(
-                                    e as Map<String, dynamic>))
-                                .toList(),
-                            edges: const [],
-                          ),
-                        ),
-                      ),
-                    )
-                  : _RecordTable(records: records),
-            ),
-          ),
-
         if (summary.isNotEmpty) ...[
-          const SizedBox(height: 8),
           Card(
             elevation: 0,
             color: theme.colorScheme.surfaceContainerHighest,
@@ -301,20 +260,8 @@ class _ResponseBody extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Text(summary,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                      fontStyle: FontStyle.italic)),
+                  style: theme.textTheme.bodyMedium),
             ),
-          ),
-        ],
-
-        if (cypher.isNotEmpty) ...[
-          const SizedBox(height: 6),
-          Padding(
-            padding: const EdgeInsets.only(left: 4),
-            child: Text(cypher,
-                style: theme.textTheme.labelSmall?.copyWith(
-                    fontFamily: 'monospace',
-                    color: theme.colorScheme.onSurfaceVariant)),
           ),
         ],
       ],

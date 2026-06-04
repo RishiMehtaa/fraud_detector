@@ -6,6 +6,7 @@ import '../models/alert.dart';
 import '../providers/alerts_provider.dart';
 import '../widgets/kpi_card.dart';
 import '../widgets/risk_badge.dart';
+import '../utils/formatters.dart';
 
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
@@ -101,8 +102,7 @@ class _DashboardContent extends StatelessWidget {
                   width: w,
                   child: KpiCard(
                     label: 'Suspicious Volume',
-                    value:
-                        '₹${(_totalAmount() / 1e6).toStringAsFixed(1)}M',
+                    value: FormatUtils.compactAmount(_totalAmount()),
                     color: const Color(0xFFF97316),
                     icon: Icons.currency_rupee,
                   ),

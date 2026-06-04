@@ -244,12 +244,9 @@ class ChatRequest(PydanticBase):
 @router.post("/chat")
 def chat(body: ChatRequest):
     result = nl_query(body.question, preset=body.preset)
-    summary = None
-    if result["records"] and not result["error"]:
-        summary = f"Query returned {len(result['records'])} record(s)."
     return {
         "cypher": result["cypher"],
         "records": result["records"][:50],
-        "summary": summary,
+        "summary": result["summary"],
         "error": result["error"],
     }

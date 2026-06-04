@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/transaction.dart';
+import '../utils/formatters.dart';
 
 class TransactionTable extends StatelessWidget {
   final List<Transaction> transactions;
@@ -40,13 +41,13 @@ class TransactionTable extends StatelessWidget {
             .map(
               (t) => DataRow(cells: [
                 DataCell(Text(
-                  _formatTs(t.timestamp),
+                  FormatUtils.time(DateTime.parse(t.timestamp)),
                   style: theme.textTheme.bodySmall
                       ?.copyWith(fontFamily: 'monospace'),
                 )),
                 DataCell(_TypeChip(type: t.type)),
                 DataCell(Text(
-                  '₹${t.amount.toStringAsFixed(0)}',
+                  FormatUtils.amount(t.amount),
                   style: theme.textTheme.bodySmall
                       ?.copyWith(fontWeight: FontWeight.w600),
                 )),
