@@ -74,7 +74,7 @@ GraphSAGE outperforms both tabular baselines because it incorporates neighborhoo
 ## **How to Run the Project**
 
 ### **Prerequisites**
-- Docker & Docker Desktop
+- Docker & Docker Desktop (required for Neo4j graph database — powers the AI chatbot queries)
 - Python 3.10+
 - Flutter SDK (latest)
 - Groq API Key (for Achilles AI)
