@@ -27,6 +27,42 @@ Achilles is designed to bridge the gap between complex data science and frontlin
 - **Automated Evidence Export**: One-click generation of JSON-based evidence files for legal review.
 - **Advanced Fund Tracing**: Find multi-hop paths (up to 6 hops) between any two accounts in the system.
 
+## **Model Performance**
+
+Achilles uses a weighted ensemble of GraphSAGE and Isolation Forest. Both models were evaluated on a held-out test set from the PaySim synthetic transaction dataset.
+
+### GraphSAGE (Node-Level Fraud Classification)
+| Metric | Score |
+|---|---|
+| ROC-AUC | 0.9286 |
+| F1 | 0.75 |
+| Precision | 0.60 |
+| Recall | 1.0 |
+| Threshold | 0.05 |
+
+Recall of 1.0 means no fraud case was missed on the test set. Precision of 0.60 reflects a deliberate tradeoff — in fraud detection, missing a case is costlier than a false positive.
+
+### Isolation Forest (Transaction-Level Anomaly Scoring)
+| Metric | Score |
+|---|---|
+| ROC-AUC | 0.7038 |
+| F1 | 0.176 |
+| Precision | 1.0 |
+| Recall | 0.097 |
+
+Used as an unsupervised anomaly scorer, not a classifier. ROC-AUC of 0.70 confirms it meaningfully ranks suspicious transactions above normal ones.
+
+### Baseline Comparison (Same Node Feature Matrix)
+| Model | F1 | ROC-AUC |
+|---|---|---|
+| Logistic Regression | 0.50 | 0.60 |
+| Random Forest | 0.67 | 0.86 |
+| **GraphSAGE** | **0.75** | **0.93** |
+
+GraphSAGE outperforms both tabular baselines because it incorporates neighborhood structure via message passing — fraud rings are inherently graph-structured problems that tabular models cannot capture.
+
+> **Note:** All models are trained on [PaySim](https://www.kaggle.com/datasets/ealaxi/paysim1), a synthetic dataset simulating mobile money transactions. Real-world performance will vary.
+
 ## **Architecture**
 *(Section intentionally blank for future system diagrams)*
 

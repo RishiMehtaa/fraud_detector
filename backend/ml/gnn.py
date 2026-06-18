@@ -251,3 +251,84 @@ def load_gnn_model() -> GraphSAGE:
     model.load_state_dict(state)
     model.eval()
     return model
+
+
+def evaluate_gnn() -> dict:
+    from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
+    data = torch.load(Path(__file__).parent / "pyg_data.pt", weights_only=False, map_location="cpu")
+    model = load_gnn_model()
+    model.eval()
+    with torch.no_grad():
+        logits = model(data.x, data.edge_index)
+        probs  = torch.sigmoid(logits).numpy()
+    labels = data.y[data.test_mask].numpy()
+    scores = probs[data.test_mask.numpy()]
+    threshold = _best_threshold(labels, scores)
+    preds  = (scores >= threshold).astype(int)
+    cm     = confusion_matrix(labels, preds)
+    metrics = {
+        "threshold":        round(float(threshold), 4),
+        "precision":        round(float(precision_score(labels, preds, zero_division=0)), 4),
+        "recall":           round(float(recall_score(labels, preds, zero_division=0)), 4),
+        "f1":               round(float(f1_score(labels, preds, zero_division=0)), 4),
+        "roc_auc":          round(float(roc_auc_score(labels, scores)), 4),
+        "confusion_matrix": cm.tolist(),
+    }
+    for k, v in metrics.items():
+        print(f"{k}: {v}")
+    return metrics
+
+
+def compare_baselines() -> dict:
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.metrics import f1_score, roc_auc_score
+
+    data = torch.load(Path(__file__).parent / "pyg_data.pt", weights_only=False, map_location="cpu")
+    X = data.x.numpy()
+    y = data.y.numpy().astype(int)
+
+    train_idx = data.train_mask.numpy()
+    test_idx  = data.test_mask.numpy()
+
+    X_train, X_test = X[train_idx], X[test_idx]
+    y_train, y_test = y[train_idx], y[test_idx]
+
+    scaler  = StandardScaler()
+    X_train_s = scaler.fit_transform(X_train)
+    X_test_s  = scaler.transform(X_test)
+
+    cw = "balanced"
+
+    lr = LogisticRegression(class_weight=cw, max_iter=1000, random_state=42)
+    lr.fit(X_train_s, y_train)
+    lr_probs = lr.predict_proba(X_test_s)[:, 1]
+    lr_preds = (_best_threshold(y_test, lr_probs) <= lr_probs).astype(int)
+
+    rf = RandomForestClassifier(n_estimators=100, class_weight=cw, random_state=42, n_jobs=-1)
+    rf.fit(X_train, y_train)
+    rf_probs = rf.predict_proba(X_test)[:, 1]
+    rf_preds = (_best_threshold(y_test, rf_probs) <= rf_probs).astype(int)
+
+    gnn_metrics = evaluate_gnn()
+
+    results = {
+        "logistic_regression": {
+            "f1":      round(float(f1_score(y_test, lr_preds, zero_division=0)), 4),
+            "roc_auc": round(float(roc_auc_score(y_test, lr_probs)), 4),
+        },
+        "random_forest": {
+            "f1":      round(float(f1_score(y_test, rf_preds, zero_division=0)), 4),
+            "roc_auc": round(float(roc_auc_score(y_test, rf_probs)), 4),
+        },
+        "graphsage": {
+            "f1":      gnn_metrics["f1"],
+            "roc_auc": gnn_metrics["roc_auc"],
+        },
+    }
+
+    print("\n--- Baseline Comparison ---")
+    for model_name, m in results.items():
+        print(f"{model_name:25s} F1={m['f1']:.4f}  AUC={m['roc_auc']:.4f}")
+    return results

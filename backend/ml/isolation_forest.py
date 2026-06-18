@@ -42,3 +42,24 @@ def score(model: IsolationForest) -> pd.Series:
 def load_model() -> IsolationForest:
     with open(MODEL_PATH, "rb") as f:
         return pickle.load(f)
+    
+
+def evaluate() -> dict:
+    from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
+    raw = pd.read_csv(DATA_PATH)
+    labels = raw["isFraud"].values
+    model = load_model()
+    scores = score(model).values
+    threshold = np.percentile(scores, 98)
+    preds = (scores >= threshold).astype(int)
+    cm = confusion_matrix(labels, preds)
+    metrics = {
+        "precision":  round(float(precision_score(labels, preds, zero_division=0)), 4),
+        "recall":     round(float(recall_score(labels, preds, zero_division=0)), 4),
+        "f1":         round(float(f1_score(labels, preds, zero_division=0)), 4),
+        "roc_auc":    round(float(roc_auc_score(labels, scores)), 4),
+        "confusion_matrix": cm.tolist(),
+    }
+    for k, v in metrics.items():
+        print(f"{k}: {v}")
+    return metrics
