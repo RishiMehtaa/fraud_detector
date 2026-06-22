@@ -64,7 +64,7 @@ GraphSAGE outperforms both tabular baselines because it incorporates neighborhoo
 > **Note:** All models are trained on [PaySim](https://www.kaggle.com/datasets/ealaxi/paysim1), a synthetic dataset simulating mobile money transactions. Real-world performance will vary.
 
 ## **Architecture**
-*(Section intentionally blank for future system diagrams)*
+<img width="2058" height="980" alt="Image" src="https://github.com/user-attachments/assets/47b6c191-7c8a-49f5-b5fd-ac43d881c18d" />
 
 ## **Demo Video**
 *(Section intentionally blank for video walkthrough)*
